@@ -3,7 +3,7 @@ TALOS_VERSION = v1.11.5
 SBCOVERLAY_VERSION = main
 
 REGISTRY ?= ghcr.io
-REGISTRY_USERNAME ?= talos-rpi5
+REGISTRY_USERNAME ?= ojsef39
 
 TAG ?= $(shell git describe --tags --exact-match)
 
@@ -110,7 +110,7 @@ installer:
 		docker \
 			run --rm -t -v ./_out:/out -v /dev:/dev --privileged $(REGISTRY)/$(REGISTRY_USERNAME)/imager:$(TALOS_TAG) \
 			metal --arch arm64 \
-			--base-installer-image="$(REGISTRY)/$(REGISTRY_USERNAME)/installer:$(TALOS_TAG)" \
+			--base-installer-image="$(REGISTRY)/$(REGISTRY_USERNAME)/talos-rpi5-installer:$(TALOS_TAG)" \
 			--overlay-name="rpi5" \
 			--overlay-image="$(REGISTRY)/$(REGISTRY_USERNAME)/sbc-raspberrypi5:$(SBCOVERLAY_TAG)" \
 			--system-extension-image="$(EXTENSIONS)"
@@ -122,9 +122,9 @@ installer:
 #
 .PHONY: release
 release:
-	docker pull $(REGISTRY)/$(REGISTRY_USERNAME)/installer:$(TALOS_TAG) && \
-		docker tag $(REGISTRY)/$(REGISTRY_USERNAME)/installer:$(TALOS_TAG) $(REGISTRY)/$(REGISTRY_USERNAME)/installer:$(TAG) && \
-		docker push $(REGISTRY)/$(REGISTRY_USERNAME)/installer:$(TAG)
+	docker pull $(REGISTRY)/$(REGISTRY_USERNAME)/talos-rpi5-installer:$(TALOS_TAG) && \
+		docker tag $(REGISTRY)/$(REGISTRY_USERNAME)/talos-rpi5-installer:$(TALOS_TAG) $(REGISTRY)/$(REGISTRY_USERNAME)/talos-rpi5-installer:$(TAG) && \
+		docker push $(REGISTRY)/$(REGISTRY_USERNAME)/talos-rpi5-installer:$(TAG)
 
 
 

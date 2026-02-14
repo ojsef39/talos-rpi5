@@ -1,10 +1,51 @@
 on:
   push:
     tags:
-      - 'v*.*.*'
+      - "v*.*.*"
+    branches:
+      - main
+    paths:
+      - "Makefile"
 
 jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    outputs:
+      should_build: ${{ steps.check.outputs.should_build }}
+      version: ${{ steps.check.outputs.version }}
+      is_tag: ${{ steps.check.outputs.is_tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Check if build should run
+        id: check
+        run: |
+          # If triggered by a tag, always build
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            echo "should_build=true" >> $GITHUB_OUTPUT
+            echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+            echo "is_tag=true" >> $GITHUB_OUTPUT
+            echo "Tag push detected: ${GITHUB_REF#refs/tags/}"
+            exit 0
+          fi
+
+          # If triggered by push to main, check if TALOS_VERSION changed
+          if git diff HEAD~1 HEAD -- Makefile | grep -q "^+TALOS_VERSION = "; then
+            VERSION=$(grep "^TALOS_VERSION = " Makefile | cut -d' ' -f3)
+            echo "should_build=true" >> $GITHUB_OUTPUT
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+            echo "is_tag=false" >> $GITHUB_OUTPUT
+            echo "TALOS_VERSION changed to $VERSION"
+          else
+            echo "should_build=false" >> $GITHUB_OUTPUT
+            echo "No TALOS_VERSION change detected"
+          fi
+
   build:
+    needs: check-version
+    if: needs.check-version.outputs.should_build == 'true'
     permissions:
       contents: write
       packages: write
@@ -39,39 +80,59 @@ jobs:
       - name: Installer
         run: make installer
 
+      - name: Create tag (if auto-release)
+        if: needs.check-version.outputs.is_tag == 'false'
+        env:
+          VERSION: ${{ needs.check-version.outputs.version }}
+        run: |
+          git tag -a "$VERSION" -m "Release $VERSION"
+          git push origin "$VERSION"
+
       - name: Release
-        if: startsWith(github.ref, 'refs/tags/v')
-        run: make release
+        env:
+          VERSION: ${{ needs.check-version.outputs.version }}
+        run: |
+          # For tag-based releases, use make release
+          if [[ "${{ needs.check-version.outputs.is_tag }}" == "true" ]]; then
+            make release
+          else
+            # For auto-releases, manually tag and push the installer image
+            TALOS_TAG=$(cd checkouts/talos && git describe --tag --always --dirty --match v[0-9]\*)
+            docker pull ghcr.io/${{ github.repository_owner }}/talos-rpi5-installer:${TALOS_TAG}
+            docker tag ghcr.io/${{ github.repository_owner }}/talos-rpi5-installer:${TALOS_TAG} ghcr.io/${{ github.repository_owner }}/talos-rpi5-installer:${VERSION}
+            docker push ghcr.io/${{ github.repository_owner }}/talos-rpi5-installer:${VERSION}
+          fi
 
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.check-version.outputs.version }}
         run: |
           NOTES=$(cat <<EOF
           > ⚠️ Experimental build, use at your own risk.
-          
+
           This is a patched version of Talos tailored for the Raspberry Pi 5, including NVMe, NIC and USB support.
-          
+
           ### What's available
-          
+
           - 📦 **Raw disk image** (\`metal-arm64.raw.zst\`) for fresh installs
-          - ⚙️  **Installer image** (\`ghcr.io/talos-rpi5/installer:${{ github.ref_name }}\`) for upgrades
-          
+          - ⚙️  **Installer image** (\`ghcr.io/${{ github.repository_owner }}/talos-rpi5-installer:${VERSION}\`) for upgrades
+
           ### Install
-          
+
           - **Fresh install**
             - Download the raw disk image from this release
             - Flash with \`dd\` or your favorite tool
-          
+
           - **Upgrade existing node**
             \`\`\`bash
-            talosctl upgrade --nodes <NODE_IP> --image ghcr.io/talos-rpi5/installer:${{ github.ref_name }}
+            talosctl upgrade --nodes <NODE_IP> --image ghcr.io/${{ github.repository_owner }}/talos-rpi5-installer:${VERSION}
             \`\`\`
-          
+
           EOF
           )
           gh release create \
-            ${{ github.ref_name }} \
+            ${VERSION} \
             ./checkouts/talos/_out/metal-arm64.raw.zst \
-            --title "${{ github.ref_name }}" \
+            --title "${VERSION}" \
             --notes "$NOTES"
