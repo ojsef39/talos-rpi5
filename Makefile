@@ -1,5 +1,5 @@
-PKG_VERSION = v1.11.0
-TALOS_VERSION = v1.11.5
+PKG_VERSION = v1.12.0
+TALOS_VERSION = v1.12.4
 SBCOVERLAY_VERSION = main
 
 REGISTRY ?= ghcr.io
@@ -54,16 +54,23 @@ checkouts-clean:
 #
 # Patches
 #
-.PHONY: patches-pkgs patches-talos patches
+.PHONY: patches-pkgs patches-talos patches-sbc patches
 patches-pkgs:
 	cd "$(CHECKOUTS_DIRECTORY)/pkgs" && \
+		git checkout -b build && \
 		git am "$(PATCHES_DIRECTORY)/siderolabs/pkgs/0001-Patched-for-Raspberry-Pi-5.patch"
 
 patches-talos:
 	cd "$(CHECKOUTS_DIRECTORY)/talos" && \
+		git checkout -b build && \
 		git am "$(PATCHES_DIRECTORY)/siderolabs/talos/0001-Patched-for-Raspberry-Pi-5.patch"
 
-patches: patches-pkgs patches-talos
+patches-sbc:
+	cd "$(CHECKOUTS_DIRECTORY)/sbc-raspberrypi5" && \
+		git checkout -b build && \
+		git am "$(PATCHES_DIRECTORY)/talos-rpi5/sbc-raspberrypi5/0001-Add-IMG_PREFIX-support-for-custom-image-naming.patch"
+
+patches: patches-pkgs patches-talos patches-sbc
 
 
 
@@ -75,6 +82,7 @@ kernel:
 	cd "$(CHECKOUTS_DIRECTORY)/pkgs" && \
 		$(MAKE) \
 			REGISTRY=$(REGISTRY) USERNAME=$(REGISTRY_USERNAME) PUSH=true \
+			PKG_PREFIX=talos-rpi5- \
 			PLATFORM=linux/arm64 \
 			kernel
 
@@ -89,9 +97,10 @@ overlay:
 	cd "$(CHECKOUTS_DIRECTORY)/sbc-raspberrypi5" && \
 		$(MAKE) \
 			REGISTRY=$(REGISTRY) USERNAME=$(REGISTRY_USERNAME) IMAGE_TAG=$(SBCOVERLAY_TAG) PUSH=true \
-			PKGS_PREFIX=$(REGISTRY)/$(REGISTRY_USERNAME) PKGS=$(PKGS_TAG) \
-			INSTALLER_ARCH=arm64 PLATFORM=linux/arm64 \
-			sbc-raspberrypi5
+			IMG_PREFIX=talos-rpi5- \
+		PKGS_PREFIX=$(REGISTRY)/$(REGISTRY_USERNAME) PKGS=$(PKGS_TAG) \
+		INSTALLER_ARCH=arm64 PLATFORM=linux/arm64 \
+		sbc-raspberrypi5
 
 
 
@@ -103,17 +112,17 @@ installer:
 	cd "$(CHECKOUTS_DIRECTORY)/talos" && \
 		$(MAKE) \
 			REGISTRY=$(REGISTRY) USERNAME=$(REGISTRY_USERNAME) PUSH=true \
-			PKG_KERNEL=$(REGISTRY)/$(REGISTRY_USERNAME)/kernel:$(PKGS_TAG) \
+			PKG_KERNEL=$(REGISTRY)/$(REGISTRY_USERNAME)/talos-rpi5-kernel:$(PKGS_TAG) \
 			INSTALLER_ARCH=arm64 PLATFORM=linux/arm64 \
-			IMAGER_ARGS="--overlay-name=rpi5 --overlay-image=$(REGISTRY)/$(REGISTRY_USERNAME)/sbc-raspberrypi5:$(SBCOVERLAY_TAG) --system-extension-image=$(EXTENSIONS)" \
+			IMAGER_ARGS="--overlay-name=rpi5 --overlay-image=$(REGISTRY)/$(REGISTRY_USERNAME)/talos-rpi5-sbc-raspberrypi5:$(SBCOVERLAY_TAG) --system-extension-image=$(EXTENSIONS)" \
 			kernel initramfs imager installer-base installer && \
-		docker \
-			run --rm -t -v ./_out:/out -v /dev:/dev --privileged $(REGISTRY)/$(REGISTRY_USERNAME)/imager:$(TALOS_TAG) \
-			metal --arch arm64 \
-			--base-installer-image="$(REGISTRY)/$(REGISTRY_USERNAME)/talos-rpi5-installer:$(TALOS_TAG)" \
-			--overlay-name="rpi5" \
-			--overlay-image="$(REGISTRY)/$(REGISTRY_USERNAME)/sbc-raspberrypi5:$(SBCOVERLAY_TAG)" \
-			--system-extension-image="$(EXTENSIONS)"
+	docker \
+		run --rm -t -v ./_out:/out -v /dev:/dev --privileged $(REGISTRY)/$(REGISTRY_USERNAME)/talos-rpi5-imager:$(TALOS_TAG) \
+		metal --arch arm64 \
+		--base-installer-image="$(REGISTRY)/$(REGISTRY_USERNAME)/talos-rpi5-installer:$(TALOS_TAG)" \
+		--overlay-name="rpi5" \
+		--overlay-image="$(REGISTRY)/$(REGISTRY_USERNAME)/talos-rpi5-sbc-raspberrypi5:$(SBCOVERLAY_TAG)" \
+		--system-extension-image="$(EXTENSIONS)"
 
 
 
