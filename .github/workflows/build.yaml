@@ -1,7 +1,7 @@
 on:
   push:
     tags:
-      - 'v*.*.*'
+      - "v*.*.*"
 
 jobs:
   build:
@@ -49,25 +49,25 @@ jobs:
         run: |
           NOTES=$(cat <<EOF
           > ⚠️ Experimental build, use at your own risk.
-          
+
           This is a patched version of Talos tailored for the Raspberry Pi 5, including NVMe, NIC and USB support.
-          
+
           ### What's available
-          
+
           - 📦 **Raw disk image** (\`metal-arm64.raw.zst\`) for fresh installs
-          - ⚙️  **Installer image** (\`ghcr.io/talos-rpi5/installer:${{ github.ref_name }}\`) for upgrades
-          
+          - ⚙️  **Installer image** (\`ghcr.io/ojsef39/talos-rpi5-installer:${{ github.ref_name }}\`) for upgrades
+
           ### Install
-          
+
           - **Fresh install**
             - Download the raw disk image from this release
             - Flash with \`dd\` or your favorite tool
-          
+
           - **Upgrade existing node**
             \`\`\`bash
-            talosctl upgrade --nodes <NODE_IP> --image ghcr.io/talos-rpi5/installer:${{ github.ref_name }}
+            talosctl upgrade --nodes <NODE_IP> --image ghcr.io/ojsef39/talos-rpi5-installer:${{ github.ref_name }}
             \`\`\`
-          
+
           EOF
           )
           gh release create \
