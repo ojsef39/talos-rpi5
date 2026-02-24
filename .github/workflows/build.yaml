@@ -15,7 +15,7 @@ jobs:
       version: ${{ steps.check.outputs.version }}
       is_tag: ${{ steps.check.outputs.is_tag }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 2
 
@@ -53,8 +53,8 @@ jobs:
       id-token: write
     runs-on: ubuntu-24.04-arm
     steps:
-      - uses: actions/checkout@v4
       - uses: imjasonh/setup-crane@v0.5
+      - uses: actions/checkout@v6
         with:
           version: v0.20.5
       - uses: docker/setup-buildx-action@v3
