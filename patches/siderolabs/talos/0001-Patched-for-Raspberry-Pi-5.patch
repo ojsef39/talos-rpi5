@@ -1,66 +1,76 @@
-From be19355287eef8688658bbf3a1d3c73cc5ed267c Mon Sep 17 00:00:00 2001
+From 6d6309980c228b23cb704e725a395ebf2e4f31bd Mon Sep 17 00:00:00 2001
 From: Josef Hofer <me@jhofer.de>
 Date: Sat, 14 Feb 2026 21:56:31 +0100
 Subject: [PATCH] Patched for Raspberry Pi 5
 
 ---
- Makefile                                      |  14 +--
+ Makefile                                      |  18 +--
  hack/modules-arm64.txt                        | 106 +++++++++++++++---
  .../runtime/v1alpha2/v1alpha2_controller.go   |  33 +++---
- 3 files changed, 113 insertions(+), 40 deletions(-)
+ 3 files changed, 115 insertions(+), 42 deletions(-)
 
 diff --git a/Makefile b/Makefile
-index 996349b45..023e09503 100644
+index 99ecb0bc2..efc1cd833 100644
 --- a/Makefile
 +++ b/Makefile
-@@ -328,10 +328,10 @@ local-%: ## Builds the specified target defined in the Dockerfile using the loca
+@@ -333,10 +333,10 @@ local-%: ## Builds the specified target defined in the Dockerfile using the loca
  
  docker-%: ## Builds the specified target defined in the Dockerfile using the docker output type. The build result will be output to the specified local destination.
  	@mkdir -p $(DEST)
--	@$(MAKE) target-$* TARGET_ARGS="--output type=docker,dest=$(DEST)/$*.tar,name=$(REGISTRY_AND_USERNAME)/$*:$(IMAGE_TAG_OUT) $(TARGET_ARGS)"
-+	@$(MAKE) target-$* TARGET_ARGS="--output type=docker,dest=$(DEST)/$*.tar,name=$(REGISTRY_AND_USERNAME)/talos-rpi5-$*:$(IMAGE_TAG_OUT) $(TARGET_ARGS)"
+-	@$(MAKE) target-$* TARGET_ARGS="--output type=docker,dest=$(DEST)/$*.tar,name=$(REGISTRY_AND_USERNAME)/$*$(IMAGE_NAME_SUFFIX):$(IMAGE_TAG_OUT) $(TARGET_ARGS)"
++	@$(MAKE) target-$* TARGET_ARGS="--output type=docker,dest=$(DEST)/$*.tar,name=$(REGISTRY_AND_USERNAME)/talos-rpi5-$*$(IMAGE_NAME_SUFFIX):$(IMAGE_TAG_OUT) $(TARGET_ARGS)"
  
  registry-%: ## Builds the specified target defined in the Dockerfile using the image/registry output type. The build result will be pushed to the registry if PUSH=true.
--	@$(MAKE) target-$* TARGET_ARGS="--output type=image,name=$(REGISTRY_AND_USERNAME)/$*:$(IMAGE_TAG_OUT),rewrite-timestamp=true $(TARGET_ARGS)"
-+	@$(MAKE) target-$* TARGET_ARGS="--output type=image,name=$(REGISTRY_AND_USERNAME)/talos-rpi5-$*:$(IMAGE_TAG_OUT),rewrite-timestamp=true $(TARGET_ARGS)"
+-	@$(MAKE) target-$* TARGET_ARGS="--output type=image,name=$(REGISTRY_AND_USERNAME)/$*$(IMAGE_NAME_SUFFIX):$(IMAGE_TAG_OUT),rewrite-timestamp=true $(TARGET_ARGS)"
++	@$(MAKE) target-$* TARGET_ARGS="--output type=image,name=$(REGISTRY_AND_USERNAME)/talos-rpi5-$*$(IMAGE_NAME_SUFFIX):$(IMAGE_TAG_OUT),rewrite-timestamp=true $(TARGET_ARGS)"
  
  hack-test-%: ## Runs the specified script in ./hack/test with well known environment variables.
  	@./hack/test/$*.sh
-@@ -423,10 +423,10 @@ sbom:
+@@ -428,7 +428,7 @@ sbom:
  	@$(MAKE) local-sbom DEST=$(ARTIFACTS)
  
- image-%: ## Builds the specified image. Valid options are aws, azure, digital-ocean, gcp, and vmware (e.g. image-aws)
--	@docker pull $(REGISTRY_AND_USERNAME)/imager:$(IMAGE_TAG_IN)
-+	@docker pull $(REGISTRY_AND_USERNAME)/talos-rpi5-imager:$(IMAGE_TAG_IN)
+ image-%: ## Builds the specified image. Valid options are aws, azure, digital-ocean, gcp, and vmware etc (e.g. image-aws)
+-	@docker pull $(REGISTRY_AND_USERNAME)/imager$(IMAGE_NAME_SUFFIX):$(IMAGE_TAG_IN)
++	@docker pull $(REGISTRY_AND_USERNAME)/talos-rpi5-imager$(IMAGE_NAME_SUFFIX):$(IMAGE_TAG_IN)
  	@for platform in $(subst $(,),$(space),$(PLATFORM)); do \
  		arch=$$(basename "$${platform}") && \
--		docker run --rm -t -e GITHUB_TOKEN -v /dev:/dev -v $(PWD)/$(ARTIFACTS):/secureboot:ro -v $(PWD)/$(ARTIFACTS):/out -e SOURCE_DATE_EPOCH=$(SOURCE_DATE_EPOCH) --network=host --privileged $(REGISTRY_AND_USERNAME)/imager:$(IMAGE_TAG_IN) $* --arch $$arch --base-installer-image $(REGISTRY_AND_USERNAME)/installer-base:$(IMAGE_TAG_IN) $(IMAGER_ARGS) ; \
-+		docker run --rm -t -e GITHUB_TOKEN -v /dev:/dev -v $(PWD)/$(ARTIFACTS):/secureboot:ro -v $(PWD)/$(ARTIFACTS):/out -e SOURCE_DATE_EPOCH=$(SOURCE_DATE_EPOCH) --network=host --privileged $(REGISTRY_AND_USERNAME)/talos-rpi5-imager:$(IMAGE_TAG_IN) $* --arch $$arch --base-installer-image $(REGISTRY_AND_USERNAME)/talos-rpi5-installer-base:$(IMAGE_TAG_IN) $(IMAGER_ARGS) ; \
+ 		docker run --rm -t \
+@@ -439,9 +439,9 @@ image-%: ## Builds the specified image. Valid options are aws, azure, digital-oc
+ 			-e GITHUB_TOKEN \
+ 			-e SOURCE_DATE_EPOCH=$(SOURCE_DATE_EPOCH) \
+ 			-e DETERMINISTIC_SEED=1 \
+-			$(REGISTRY_AND_USERNAME)/imager$(IMAGE_NAME_SUFFIX):$(IMAGE_TAG_IN) $* \
++			$(REGISTRY_AND_USERNAME)/talos-rpi5-imager$(IMAGE_NAME_SUFFIX):$(IMAGE_TAG_IN) $* \
+ 			--arch $$arch \
+-			--base-installer-image $(REGISTRY_AND_USERNAME)/installer-base$(IMAGE_NAME_SUFFIX):$(IMAGE_TAG_IN) \
++			--base-installer-image $(REGISTRY_AND_USERNAME)/talos-rpi5-installer-base$(IMAGE_NAME_SUFFIX):$(IMAGE_TAG_IN) \
+ 			$(IMAGER_ARGS) || exit 1 ; \
  	done
  
- .PHONY: images-essential
-@@ -445,16 +445,16 @@ IMAGES_LIST :=
+@@ -464,17 +464,17 @@ IMAGES_LIST :=
  
  .PHONY: installer
  installer: ## Builds the installer and outputs it to the artifact directory.
--	@$(MAKE) image-installer IMAGER_ARGS="--base-installer-image $(REGISTRY_AND_USERNAME)/installer-base:$(IMAGE_TAG_IN) $(IMAGER_ARGS)"
-+	@$(MAKE) image-installer IMAGER_ARGS="--base-installer-image $(REGISTRY_AND_USERNAME)/talos-rpi5-installer-base:$(IMAGE_TAG_IN) $(IMAGER_ARGS)"
+-	@$(MAKE) image-installer IMAGER_ARGS="--base-installer-image $(REGISTRY_AND_USERNAME)/installer-base$(IMAGE_NAME_SUFFIX):$(IMAGE_TAG_IN) $(IMAGER_ARGS)"
++	@$(MAKE) image-installer IMAGER_ARGS="--base-installer-image $(REGISTRY_AND_USERNAME)/talos-rpi5-installer-base$(IMAGE_NAME_SUFFIX):$(IMAGE_TAG_IN) $(IMAGER_ARGS)"
  
  	@crane_args=""
  	@for platform in $(subst $(,),$(space),$(PLATFORM)); do \
  		arch=$$(basename "$${platform}") && \
--		image=$$(crane push $(ARTIFACTS)/installer-$${arch}.tar $(REGISTRY_AND_USERNAME)/installer:$(IMAGE_TAG_OUT)-$${arch}) && \
-+		image=$$(crane push $(ARTIFACTS)/installer-$${arch}.tar $(REGISTRY_AND_USERNAME)/talos-rpi5-installer:$(IMAGE_TAG_OUT)-$${arch}) && \
+-		image=$$(crane push $(ARTIFACTS)/installer-$${arch}.tar $(REGISTRY_AND_USERNAME)/installer$(IMAGE_NAME_SUFFIX):$(IMAGE_TAG_OUT)-$${arch}) && \
++		image=$$(crane push $(ARTIFACTS)/installer-$${arch}.tar $(REGISTRY_AND_USERNAME)/talos-rpi5-installer$(IMAGE_NAME_SUFFIX):$(IMAGE_TAG_OUT)-$${arch}) && \
  		crane_args="$${crane_args} -m $${image}" && \
  		rm -f $(ARTIFACTS)/installer-$${arch}.tar ; \
  	done; \
--	crane index append -t "${REGISTRY_AND_USERNAME}/installer:${IMAGE_TAG_OUT}" $${crane_args}
-+	crane index append -t "${REGISTRY_AND_USERNAME}/talos-rpi5-installer:${IMAGE_TAG_OUT}" $${crane_args}
+-	crane index append -t "${REGISTRY_AND_USERNAME}/installer$(IMAGE_NAME_SUFFIX):${IMAGE_TAG_OUT}" $${crane_args}
+-	@echo "${REGISTRY_AND_USERNAME}/installer$(IMAGE_NAME_SUFFIX):${IMAGE_TAG_OUT}" > $(ARTIFACTS)/installer_image
++	crane index append -t "${REGISTRY_AND_USERNAME}/talos-rpi5-installer$(IMAGE_NAME_SUFFIX):${IMAGE_TAG_OUT}" $${crane_args}
++	@echo "${REGISTRY_AND_USERNAME}/talos-rpi5-installer$(IMAGE_NAME_SUFFIX):${IMAGE_TAG_OUT}" > $(ARTIFACTS)/installer_image
  
  
  .PHONY: secureboot-installer
 diff --git a/hack/modules-arm64.txt b/hack/modules-arm64.txt
-index 8df29effd..b91c79774 100644
+index 319415b2f..1b3d9395a 100644
 --- a/hack/modules-arm64.txt
 +++ b/hack/modules-arm64.txt
 @@ -1,11 +1,26 @@
@@ -117,7 +127,7 @@ index 8df29effd..b91c79774 100644
  kernel/drivers/gpu/host1x/host1x.ko
  kernel/drivers/hid/hid-a4tech.ko
  kernel/drivers/hid/hid-apple.ko
-@@ -58,7 +80,7 @@ kernel/drivers/infiniband/hw/irdma/irdma.ko
+@@ -59,7 +81,7 @@ kernel/drivers/infiniband/hw/irdma/irdma.ko
  kernel/drivers/infiniband/hw/mlx4/mlx4_ib.ko
  kernel/drivers/infiniband/hw/mlx5/mlx5_ib.ko
  kernel/drivers/infiniband/sw/rxe/rdma_rxe.ko
@@ -126,7 +136,7 @@ index 8df29effd..b91c79774 100644
  kernel/drivers/irqchip/irq-imx-mu-msi.ko
  kernel/drivers/leds/led-class-multicolor.ko
  kernel/drivers/mailbox/bcm-flexrm-mailbox.ko
-@@ -66,13 +88,22 @@ kernel/drivers/md/bcache/bcache.ko
+@@ -67,13 +89,22 @@ kernel/drivers/md/bcache/bcache.ko
  kernel/drivers/md/dm-bio-prison.ko
  kernel/drivers/md/dm-cache-smq.ko
  kernel/drivers/md/dm-cache.ko
@@ -150,7 +160,7 @@ index 8df29effd..b91c79774 100644
  kernel/drivers/misc/hpilo.ko
  kernel/drivers/mmc/host/sdhci_f_sdh30.ko
  kernel/drivers/mmc/host/sdhci-acpi.ko
-@@ -86,7 +117,6 @@ kernel/drivers/mmc/host/sdhci-of-esdhc.ko
+@@ -87,7 +118,6 @@ kernel/drivers/mmc/host/sdhci-of-esdhc.ko
  kernel/drivers/mmc/host/sdhci-pci.ko
  kernel/drivers/mmc/host/sdhci-pltfm.ko
  kernel/drivers/mmc/host/sdhci-tegra.ko
@@ -158,7 +168,7 @@ index 8df29effd..b91c79774 100644
  kernel/drivers/mmc/host/sdhci-xenon-driver.ko
  kernel/drivers/net/ethernet/amazon/ena/ena.ko
  kernel/drivers/net/ethernet/aquantia/atlantic/atlantic.ko
-@@ -96,6 +126,11 @@ kernel/drivers/net/ethernet/broadcom/bnx2x/bnx2x.ko
+@@ -97,6 +127,11 @@ kernel/drivers/net/ethernet/broadcom/bnx2x/bnx2x.ko
  kernel/drivers/net/ethernet/broadcom/bnxt/bnxt_en.ko
  kernel/drivers/net/ethernet/broadcom/tg3.ko
  kernel/drivers/net/ethernet/cavium/common/cavium_ptp.ko
@@ -170,7 +180,7 @@ index 8df29effd..b91c79774 100644
  kernel/drivers/net/ethernet/cisco/enic/enic.ko
  kernel/drivers/net/ethernet/google/gve/gve.ko
  kernel/drivers/net/ethernet/hisilicon/hip04_eth.ko
-@@ -116,16 +151,12 @@ kernel/drivers/net/ethernet/intel/e1000e/e1000e.ko
+@@ -117,16 +152,12 @@ kernel/drivers/net/ethernet/intel/e1000e/e1000e.ko
  kernel/drivers/net/ethernet/intel/i40e/i40e.ko
  kernel/drivers/net/ethernet/intel/iavf/iavf.ko
  kernel/drivers/net/ethernet/intel/ice/ice.ko
@@ -187,7 +197,7 @@ index 8df29effd..b91c79774 100644
  kernel/drivers/net/ethernet/intel/libie/libie.ko
  kernel/drivers/net/ethernet/marvell/sky2.ko
  kernel/drivers/net/ethernet/mellanox/mlx4/mlx4_core.ko
-@@ -151,7 +182,6 @@ kernel/drivers/net/ethernet/stmicro/stmmac/dwmac-ipq806x.ko
+@@ -152,7 +183,6 @@ kernel/drivers/net/ethernet/stmicro/stmmac/dwmac-ipq806x.ko
  kernel/drivers/net/ethernet/stmicro/stmmac/dwmac-meson.ko
  kernel/drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.ko
  kernel/drivers/net/ethernet/stmicro/stmmac/dwmac-qcom-ethqos.ko
@@ -195,7 +205,7 @@ index 8df29effd..b91c79774 100644
  kernel/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.ko
  kernel/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.ko
  kernel/drivers/net/ethernet/stmicro/stmmac/dwmac-sunxi.ko
-@@ -160,14 +190,46 @@ kernel/drivers/net/ethernet/stmicro/stmmac/stmmac-pci.ko
+@@ -161,14 +191,46 @@ kernel/drivers/net/ethernet/stmicro/stmmac/stmmac-pci.ko
  kernel/drivers/net/ethernet/stmicro/stmmac/stmmac-platform.ko
  kernel/drivers/net/ethernet/stmicro/stmmac/stmmac.ko
  kernel/drivers/net/mdio.ko
@@ -243,7 +253,7 @@ index 8df29effd..b91c79774 100644
  kernel/drivers/nvme/target/nvme-loop.ko
  kernel/drivers/nvme/target/nvmet-fc.ko
  kernel/drivers/nvme/target/nvmet-rdma.ko
-@@ -197,12 +259,16 @@ kernel/drivers/scsi/mpt3sas/mpt3sas.ko
+@@ -198,12 +260,16 @@ kernel/drivers/scsi/mpt3sas/mpt3sas.ko
  kernel/drivers/scsi/qedf/qedf.ko
  kernel/drivers/scsi/qla2xxx/qla2xxx.ko
  kernel/drivers/scsi/smartpqi/smartpqi.ko
@@ -260,7 +270,7 @@ index 8df29effd..b91c79774 100644
  kernel/drivers/vdpa/mlx5/mlx5_vdpa.ko
  kernel/drivers/vdpa/octeon_ep/octep_vdpa.ko
  kernel/drivers/vdpa/solidrun/snet_vdpa.ko
-@@ -226,13 +292,23 @@ kernel/drivers/virtio/virtio_pci_modern_dev.ko
+@@ -227,13 +293,23 @@ kernel/drivers/virtio/virtio_pci_modern_dev.ko
  kernel/drivers/virtio/virtio_pci.ko
  kernel/drivers/virtio/virtio_vdpa.ko
  kernel/drivers/watchdog/sbsa_gwdt.ko
@@ -289,10 +299,10 @@ index 8df29effd..b91c79774 100644
 +kernel/sound/usb/snd-usb-audio.ko
 +kernel/sound/usb/snd-usbmidi-lib.ko
 diff --git a/internal/app/machined/pkg/runtime/v1alpha2/v1alpha2_controller.go b/internal/app/machined/pkg/runtime/v1alpha2/v1alpha2_controller.go
-index 29b297654..80ea743a4 100644
+index 92e784126..a6d8b6ff1 100644
 --- a/internal/app/machined/pkg/runtime/v1alpha2/v1alpha2_controller.go
 +++ b/internal/app/machined/pkg/runtime/v1alpha2/v1alpha2_controller.go
-@@ -113,27 +113,24 @@ func (ctrl *Controller) Run(ctx context.Context, drainer *runtime.Drainer) error
+@@ -114,27 +114,24 @@ func (ctrl *Controller) Run(ctx context.Context, drainer *runtime.Drainer) error
  
  	networkBindMountTarget = constants.SystemResolvedPath
  
@@ -336,5 +346,5 @@ index 29b297654..80ea743a4 100644
  
  	if err := etcRoot.OpenFS(); err != nil {
 -- 
-2.52.0
+2.53.0
 
