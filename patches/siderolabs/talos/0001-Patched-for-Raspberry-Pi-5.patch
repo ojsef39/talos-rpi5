@@ -1,4 +1,4 @@
-From 6d6309980c228b23cb704e725a395ebf2e4f31bd Mon Sep 17 00:00:00 2001
+From 966d2c9cfc21b3a4d6b8086a8241d2c9ba982123 Mon Sep 17 00:00:00 2001
 From: Josef Hofer <me@jhofer.de>
 Date: Sat, 14 Feb 2026 21:56:31 +0100
 Subject: [PATCH] Patched for Raspberry Pi 5
@@ -10,7 +10,7 @@ Subject: [PATCH] Patched for Raspberry Pi 5
  3 files changed, 115 insertions(+), 42 deletions(-)
 
 diff --git a/Makefile b/Makefile
-index 99ecb0bc2..efc1cd833 100644
+index ea2d55caa..bad8b85a9 100644
 --- a/Makefile
 +++ b/Makefile
 @@ -333,10 +333,10 @@ local-%: ## Builds the specified target defined in the Dockerfile using the loca
@@ -70,7 +70,7 @@ index 99ecb0bc2..efc1cd833 100644
  
  .PHONY: secureboot-installer
 diff --git a/hack/modules-arm64.txt b/hack/modules-arm64.txt
-index 319415b2f..1b3d9395a 100644
+index 9888d2b0f..00421b8b8 100644
 --- a/hack/modules-arm64.txt
 +++ b/hack/modules-arm64.txt
 @@ -1,11 +1,26 @@
@@ -203,14 +203,15 @@ index 319415b2f..1b3d9395a 100644
  kernel/drivers/net/ethernet/stmicro/stmmac/dwmac-qcom-ethqos.ko
 -kernel/drivers/net/ethernet/stmicro/stmmac/dwmac-renesas-gbeth.ko
  kernel/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.ko
+ kernel/drivers/net/ethernet/stmicro/stmmac/dwmac-sun55i.ko
  kernel/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.ko
- kernel/drivers/net/ethernet/stmicro/stmmac/dwmac-sunxi.ko
-@@ -161,14 +191,46 @@ kernel/drivers/net/ethernet/stmicro/stmmac/stmmac-pci.ko
+@@ -162,15 +192,47 @@ kernel/drivers/net/ethernet/stmicro/stmmac/stmmac-pci.ko
  kernel/drivers/net/ethernet/stmicro/stmmac/stmmac-platform.ko
  kernel/drivers/net/ethernet/stmicro/stmmac/stmmac.ko
  kernel/drivers/net/mdio.ko
 +kernel/drivers/net/mdio/mdio-mux-meson-gxl.ko
  kernel/drivers/net/pcs/pcs_xpcs.ko
+ kernel/drivers/net/pcs/pcs-rzn1-miic.ko
 +kernel/drivers/net/phy/ax88796b.ko
  kernel/drivers/net/phy/dp83867.ko
 +kernel/drivers/net/thunderbolt/thunderbolt_net.ko
@@ -253,7 +254,7 @@ index 319415b2f..1b3d9395a 100644
  kernel/drivers/nvme/target/nvme-loop.ko
  kernel/drivers/nvme/target/nvmet-fc.ko
  kernel/drivers/nvme/target/nvmet-rdma.ko
-@@ -198,12 +260,16 @@ kernel/drivers/scsi/mpt3sas/mpt3sas.ko
+@@ -200,12 +262,16 @@ kernel/drivers/scsi/mpt3sas/mpt3sas.ko
  kernel/drivers/scsi/qedf/qedf.ko
  kernel/drivers/scsi/qla2xxx/qla2xxx.ko
  kernel/drivers/scsi/smartpqi/smartpqi.ko
@@ -270,7 +271,7 @@ index 319415b2f..1b3d9395a 100644
  kernel/drivers/vdpa/mlx5/mlx5_vdpa.ko
  kernel/drivers/vdpa/octeon_ep/octep_vdpa.ko
  kernel/drivers/vdpa/solidrun/snet_vdpa.ko
-@@ -227,13 +293,23 @@ kernel/drivers/virtio/virtio_pci_modern_dev.ko
+@@ -229,13 +295,23 @@ kernel/drivers/virtio/virtio_pci_modern_dev.ko
  kernel/drivers/virtio/virtio_pci.ko
  kernel/drivers/virtio/virtio_vdpa.ko
  kernel/drivers/watchdog/sbsa_gwdt.ko
