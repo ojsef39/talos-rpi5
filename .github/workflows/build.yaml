@@ -99,14 +99,6 @@ jobs:
       - name: Installer
         run: make installer
 
-      - name: Create tag (if auto-release)
-        if: needs.check-version.outputs.is_tag == 'false' && needs.check-version.outputs.is_pr != 'true'
-        env:
-          VERSION: ${{ needs.check-version.outputs.version }}
-        run: |
-          git tag -a "$VERSION" -m "Release $VERSION"
-          git push origin "$VERSION"
-
       - name: Release
         if: needs.check-version.outputs.is_pr != 'true'
         env:
@@ -152,8 +144,11 @@ jobs:
 
           EOF
           )
+          # --target creates the tag via the Releases API. Pushing it over git
+          # instead fails: GITHUB_TOKEN may not create a ref containing workflow files.
           gh release create \
             ${VERSION} \
             ./checkouts/talos/_out/metal-arm64.raw.zst \
+            --target "${{ github.sha }}" \
             --title "${VERSION}" \
             --notes "$NOTES"
