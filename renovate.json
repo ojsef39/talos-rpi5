@@ -6,6 +6,7 @@
   "reviewers": [
     "ojsef39"
   ],
+  "separateMinorPatch": true,
   "customManagers": [
     {
       "customType": "regex",
