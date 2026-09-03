@@ -1,6 +1,6 @@
 # this comment is just here to trigger a new release
 PKG_VERSION = v1.13.0
-TALOS_VERSION = v1.13.9
+TALOS_VERSION = v1.13.10
 SBCOVERLAY_VERSION = main
 
 REGISTRY ?= ghcr.io
