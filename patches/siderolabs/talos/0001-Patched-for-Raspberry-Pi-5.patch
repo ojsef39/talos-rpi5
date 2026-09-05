@@ -1,14 +1,14 @@
-From 0137be58422fe67b7827845659296de30e089655 Mon Sep 17 00:00:00 2001
+From 3568b85ab5c0c773405faec029da8ef26743eb7f Mon Sep 17 00:00:00 2001
 From: Josef Hofer <me@jhofer.de>
 Date: Sat, 14 Feb 2026 21:56:31 +0100
 Subject: [PATCH] Patched for Raspberry Pi 5
 
 ---
  Makefile                                      |  18 +-
- hack/modules-arm64.txt                        | 205 ++++++++----------
+ hack/modules-arm64.txt                        | 197 +++++++++---------
  .../v1alpha1/bootloader/sdboot/rpi5_test.go   |  61 ++++++
  .../v1alpha1/bootloader/sdboot/sdboot.go      |  67 +++---
- 4 files changed, 207 insertions(+), 144 deletions(-)
+ 4 files changed, 209 insertions(+), 134 deletions(-)
  create mode 100644 internal/app/machined/pkg/runtime/v1alpha1/bootloader/sdboot/rpi5_test.go
 
 diff --git a/Makefile b/Makefile
@@ -73,10 +73,10 @@ index 3e3ced2e7..83f41e151 100644
  
  .PHONY: secureboot-installer
 diff --git a/hack/modules-arm64.txt b/hack/modules-arm64.txt
-index 1cae2f145..a2348487c 100644
+index 1cae2f145..61629bede 100644
 --- a/hack/modules-arm64.txt
 +++ b/hack/modules-arm64.txt
-@@ -1,43 +1,52 @@
+@@ -1,31 +1,39 @@
 +modules.alias
 +modules.alias.bin
 +modules.builtin
@@ -97,8 +97,8 @@ index 1cae2f145..a2348487c 100644
  kernel/crypto/async_tx/async_raid6_recov.ko
  kernel/crypto/async_tx/async_tx.ko
  kernel/crypto/async_tx/async_xor.ko
--kernel/crypto/hkdf.ko
 +kernel/crypto/blake2b_generic.ko
+ kernel/crypto/hkdf.ko
  kernel/crypto/xor.ko
 -kernel/drivers/acpi/ac.ko
 -kernel/drivers/acpi/battery.ko
@@ -127,8 +127,7 @@ index 1cae2f145..a2348487c 100644
  kernel/drivers/gpu/drm/drm_buddy.ko
  kernel/drivers/gpu/drm/drm_exec.ko
  kernel/drivers/gpu/drm/drm_gpuvm.ko
--kernel/drivers/gpu/drm/drm_panel_backlight_quirks.ko
- kernel/drivers/gpu/drm/drm_suballoc_helper.ko
+@@ -34,10 +42,13 @@ kernel/drivers/gpu/drm/drm_suballoc_helper.ko
  kernel/drivers/gpu/drm/drm_ttm_helper.ko
  kernel/drivers/gpu/drm/drm_vram_helper.ko
  kernel/drivers/gpu/drm/hisilicon/hibmc/hibmc-drm.ko
@@ -143,7 +142,7 @@ index 1cae2f145..a2348487c 100644
  kernel/drivers/gpu/host1x/host1x.ko
  kernel/drivers/hid/hid-a4tech.ko
  kernel/drivers/hid/hid-apple.ko
-@@ -56,38 +65,22 @@ kernel/drivers/hid/hid-monterey.ko
+@@ -56,17 +67,11 @@ kernel/drivers/hid/hid-monterey.ko
  kernel/drivers/hid/hid-multitouch.ko
  kernel/drivers/hid/hid-petalynx.ko
  kernel/drivers/hid/hid-pl.ko
@@ -151,7 +150,7 @@ index 1cae2f145..a2348487c 100644
  kernel/drivers/hid/hid-samsung.ko
  kernel/drivers/hid/hid-sunplus.ko
  kernel/drivers/hid/hid-topseed.ko
--kernel/drivers/hid/usbhid/usbhid.ko
+ kernel/drivers/hid/usbhid/usbhid.ko
 -kernel/drivers/hv/hv_balloon.ko
 -kernel/drivers/hv/hv_utils.ko
 -kernel/drivers/hwmon/acpi_power_meter.ko
@@ -161,12 +160,9 @@ index 1cae2f145..a2348487c 100644
  kernel/drivers/i2c/algos/i2c-algo-bit.ko
  kernel/drivers/i2c/busses/i2c-i801.ko
  kernel/drivers/i2c/i2c-mux.ko
--kernel/drivers/infiniband/core/ib_cm.ko
--kernel/drivers/infiniband/core/ib_core.ko
- kernel/drivers/infiniband/core/ib_umad.ko
- kernel/drivers/infiniband/core/ib_uverbs.ko
--kernel/drivers/infiniband/core/iw_cm.ko
--kernel/drivers/infiniband/core/rdma_cm.ko
+@@ -77,16 +82,12 @@ kernel/drivers/infiniband/core/ib_uverbs.ko
+ kernel/drivers/infiniband/core/iw_cm.ko
+ kernel/drivers/infiniband/core/rdma_cm.ko
  kernel/drivers/infiniband/core/rdma_ucm.ko
 -kernel/drivers/infiniband/hw/bnxt_re/bnxt_re.ko
  kernel/drivers/infiniband/hw/hns/hns-roce-hw-v2.ko
@@ -178,12 +174,11 @@ index 1cae2f145..a2348487c 100644
 -kernel/drivers/input/misc/xen-kbdfront.ko
 -kernel/drivers/input/mouse/psmouse.ko
 -kernel/drivers/input/serio/hyperv-keyboard.ko
--kernel/drivers/iommu/iommufd/iommufd.ko
 +kernel/drivers/input/misc/uinput.ko
+ kernel/drivers/iommu/iommufd/iommufd.ko
  kernel/drivers/irqchip/irq-imx-mu-msi.ko
  kernel/drivers/leds/led-class-multicolor.ko
- kernel/drivers/mailbox/bcm-flexrm-mailbox.ko
-@@ -95,15 +88,23 @@ kernel/drivers/md/bcache/bcache.ko
+@@ -95,15 +96,25 @@ kernel/drivers/md/bcache/bcache.ko
  kernel/drivers/md/dm-bio-prison.ko
  kernel/drivers/md/dm-cache-smq.ko
  kernel/drivers/md/dm-cache.ko
@@ -205,11 +200,13 @@ index 1cae2f145..a2348487c 100644
 +kernel/drivers/media/v4l2-core/v4l2-dv-timings.ko
 +kernel/drivers/media/v4l2-core/videodev.ko
  kernel/drivers/misc/hpilo.ko
++kernel/drivers/mmc/host/sdhci-uhs2.ko
++kernel/drivers/mmc/host/sdhci.ko
 +kernel/drivers/mmc/host/sdhci_f_sdh30.ko
  kernel/drivers/mmc/host/sdhci-acpi.ko
  kernel/drivers/mmc/host/sdhci-brcmstb.ko
  kernel/drivers/mmc/host/sdhci-cadence.ko
-@@ -115,12 +116,8 @@ kernel/drivers/mmc/host/sdhci-of-esdhc.ko
+@@ -115,12 +126,8 @@ kernel/drivers/mmc/host/sdhci-of-esdhc.ko
  kernel/drivers/mmc/host/sdhci-pci.ko
  kernel/drivers/mmc/host/sdhci-pltfm.ko
  kernel/drivers/mmc/host/sdhci-tegra.ko
@@ -222,7 +219,7 @@ index 1cae2f145..a2348487c 100644
  kernel/drivers/net/ethernet/aquantia/atlantic/atlantic.ko
  kernel/drivers/net/ethernet/atheros/alx/alx.ko
  kernel/drivers/net/ethernet/broadcom/bnx2.ko
-@@ -128,11 +125,17 @@ kernel/drivers/net/ethernet/broadcom/bnx2x/bnx2x.ko
+@@ -128,11 +135,17 @@ kernel/drivers/net/ethernet/broadcom/bnx2x/bnx2x.ko
  kernel/drivers/net/ethernet/broadcom/bnxt/bnxt_en.ko
  kernel/drivers/net/ethernet/broadcom/tg3.ko
  kernel/drivers/net/ethernet/cavium/common/cavium_ptp.ko
@@ -240,7 +237,7 @@ index 1cae2f145..a2348487c 100644
  kernel/drivers/net/ethernet/hisilicon/hns/hnae.ko
  kernel/drivers/net/ethernet/hisilicon/hns/hns_dsaf.ko
  kernel/drivers/net/ethernet/hisilicon/hns/hns_enet_drv.ko
-@@ -141,24 +144,19 @@ kernel/drivers/net/ethernet/hisilicon/hns3/hclge.ko
+@@ -141,21 +154,18 @@ kernel/drivers/net/ethernet/hisilicon/hns3/hclge.ko
  kernel/drivers/net/ethernet/hisilicon/hns3/hclgevf.ko
  kernel/drivers/net/ethernet/hisilicon/hns3/hnae3.ko
  kernel/drivers/net/ethernet/hisilicon/hns3/hns3.ko
@@ -260,12 +257,9 @@ index 1cae2f145..a2348487c 100644
  kernel/drivers/net/ethernet/intel/libeth/libeth.ko
 -kernel/drivers/net/ethernet/intel/libeth/libeth_xdp.ko
  kernel/drivers/net/ethernet/intel/libie/libie.ko
--kernel/drivers/net/ethernet/intel/libie/libie_adminq.ko
--kernel/drivers/net/ethernet/intel/libie/libie_fwlog.ko
- kernel/drivers/net/ethernet/marvell/sky2.ko
- kernel/drivers/net/ethernet/mellanox/mlx4/mlx4_core.ko
- kernel/drivers/net/ethernet/mellanox/mlx4/mlx4_en.ko
-@@ -183,37 +181,58 @@ kernel/drivers/net/ethernet/stmicro/stmmac/dwmac-ipq806x.ko
+ kernel/drivers/net/ethernet/intel/libie/libie_adminq.ko
+ kernel/drivers/net/ethernet/intel/libie/libie_fwlog.ko
+@@ -183,37 +193,58 @@ kernel/drivers/net/ethernet/stmicro/stmmac/dwmac-ipq806x.ko
  kernel/drivers/net/ethernet/stmicro/stmmac/dwmac-meson.ko
  kernel/drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.ko
  kernel/drivers/net/ethernet/stmicro/stmmac/dwmac-qcom-ethqos.ko
@@ -335,7 +329,7 @@ index 1cae2f145..a2348487c 100644
  kernel/drivers/perf/hisilicon/hisi_pcie_pmu.ko
  kernel/drivers/perf/hisilicon/hisi_uncore_cpa_pmu.ko
  kernel/drivers/perf/hisilicon/hisi_uncore_ddrc_pmu.ko
-@@ -230,7 +249,6 @@ kernel/drivers/scsi/hisi_sas/hisi_sas_v1_hw.ko
+@@ -230,7 +261,6 @@ kernel/drivers/scsi/hisi_sas/hisi_sas_v1_hw.ko
  kernel/drivers/scsi/hisi_sas/hisi_sas_v2_hw.ko
  kernel/drivers/scsi/hisi_sas/hisi_sas_v3_hw.ko
  kernel/drivers/scsi/hpsa.ko
@@ -343,7 +337,7 @@ index 1cae2f145..a2348487c 100644
  kernel/drivers/scsi/libfc/libfc.ko
  kernel/drivers/scsi/lpfc/lpfc.ko
  kernel/drivers/scsi/megaraid/megaraid_sas.ko
-@@ -239,89 +257,56 @@ kernel/drivers/scsi/mpt3sas/mpt3sas.ko
+@@ -239,89 +269,56 @@ kernel/drivers/scsi/mpt3sas/mpt3sas.ko
  kernel/drivers/scsi/qedf/qedf.ko
  kernel/drivers/scsi/qla2xxx/qla2xxx.ko
  kernel/drivers/scsi/smartpqi/smartpqi.ko
