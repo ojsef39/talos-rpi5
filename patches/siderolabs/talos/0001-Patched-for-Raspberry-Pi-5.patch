@@ -1,14 +1,14 @@
-From 3568b85ab5c0c773405faec029da8ef26743eb7f Mon Sep 17 00:00:00 2001
+From 738de72fa58f9d7318c920ac44f2d421b9017c05 Mon Sep 17 00:00:00 2001
 From: Josef Hofer <me@jhofer.de>
 Date: Sat, 14 Feb 2026 21:56:31 +0100
 Subject: [PATCH] Patched for Raspberry Pi 5
 
 ---
  Makefile                                      |  18 +-
- hack/modules-arm64.txt                        | 197 +++++++++---------
+ hack/modules-arm64.txt                        | 195 +++++++++---------
  .../v1alpha1/bootloader/sdboot/rpi5_test.go   |  61 ++++++
  .../v1alpha1/bootloader/sdboot/sdboot.go      |  67 +++---
- 4 files changed, 209 insertions(+), 134 deletions(-)
+ 4 files changed, 209 insertions(+), 132 deletions(-)
  create mode 100644 internal/app/machined/pkg/runtime/v1alpha1/bootloader/sdboot/rpi5_test.go
 
 diff --git a/Makefile b/Makefile
@@ -73,7 +73,7 @@ index 3e3ced2e7..83f41e151 100644
  
  .PHONY: secureboot-installer
 diff --git a/hack/modules-arm64.txt b/hack/modules-arm64.txt
-index 1cae2f145..61629bede 100644
+index 1cae2f145..fd40d589f 100644
 --- a/hack/modules-arm64.txt
 +++ b/hack/modules-arm64.txt
 @@ -1,31 +1,39 @@
@@ -237,7 +237,7 @@ index 1cae2f145..61629bede 100644
  kernel/drivers/net/ethernet/hisilicon/hns/hnae.ko
  kernel/drivers/net/ethernet/hisilicon/hns/hns_dsaf.ko
  kernel/drivers/net/ethernet/hisilicon/hns/hns_enet_drv.ko
-@@ -141,21 +154,18 @@ kernel/drivers/net/ethernet/hisilicon/hns3/hclge.ko
+@@ -141,7 +154,6 @@ kernel/drivers/net/ethernet/hisilicon/hns3/hclge.ko
  kernel/drivers/net/ethernet/hisilicon/hns3/hclgevf.ko
  kernel/drivers/net/ethernet/hisilicon/hns3/hnae3.ko
  kernel/drivers/net/ethernet/hisilicon/hns3/hns3.ko
@@ -245,21 +245,7 @@ index 1cae2f145..61629bede 100644
  kernel/drivers/net/ethernet/intel/e100.ko
  kernel/drivers/net/ethernet/intel/e1000/e1000.ko
  kernel/drivers/net/ethernet/intel/e1000e/e1000e.ko
- kernel/drivers/net/ethernet/intel/i40e/i40e.ko
- kernel/drivers/net/ethernet/intel/iavf/iavf.ko
- kernel/drivers/net/ethernet/intel/ice/ice.ko
--kernel/drivers/net/ethernet/intel/idpf/idpf.ko
- kernel/drivers/net/ethernet/intel/igb/igb.ko
- kernel/drivers/net/ethernet/intel/igbvf/igbvf.ko
- kernel/drivers/net/ethernet/intel/igc/igc.ko
- kernel/drivers/net/ethernet/intel/ixgbe/ixgbe.ko
- kernel/drivers/net/ethernet/intel/ixgbevf/ixgbevf.ko
- kernel/drivers/net/ethernet/intel/libeth/libeth.ko
--kernel/drivers/net/ethernet/intel/libeth/libeth_xdp.ko
- kernel/drivers/net/ethernet/intel/libie/libie.ko
- kernel/drivers/net/ethernet/intel/libie/libie_adminq.ko
- kernel/drivers/net/ethernet/intel/libie/libie_fwlog.ko
-@@ -183,37 +193,58 @@ kernel/drivers/net/ethernet/stmicro/stmmac/dwmac-ipq806x.ko
+@@ -183,37 +195,58 @@ kernel/drivers/net/ethernet/stmicro/stmmac/dwmac-ipq806x.ko
  kernel/drivers/net/ethernet/stmicro/stmmac/dwmac-meson.ko
  kernel/drivers/net/ethernet/stmicro/stmmac/dwmac-meson8b.ko
  kernel/drivers/net/ethernet/stmicro/stmmac/dwmac-qcom-ethqos.ko
@@ -329,7 +315,7 @@ index 1cae2f145..61629bede 100644
  kernel/drivers/perf/hisilicon/hisi_pcie_pmu.ko
  kernel/drivers/perf/hisilicon/hisi_uncore_cpa_pmu.ko
  kernel/drivers/perf/hisilicon/hisi_uncore_ddrc_pmu.ko
-@@ -230,7 +261,6 @@ kernel/drivers/scsi/hisi_sas/hisi_sas_v1_hw.ko
+@@ -230,7 +263,6 @@ kernel/drivers/scsi/hisi_sas/hisi_sas_v1_hw.ko
  kernel/drivers/scsi/hisi_sas/hisi_sas_v2_hw.ko
  kernel/drivers/scsi/hisi_sas/hisi_sas_v3_hw.ko
  kernel/drivers/scsi/hpsa.ko
@@ -337,7 +323,7 @@ index 1cae2f145..61629bede 100644
  kernel/drivers/scsi/libfc/libfc.ko
  kernel/drivers/scsi/lpfc/lpfc.ko
  kernel/drivers/scsi/megaraid/megaraid_sas.ko
-@@ -239,89 +269,56 @@ kernel/drivers/scsi/mpt3sas/mpt3sas.ko
+@@ -239,89 +271,56 @@ kernel/drivers/scsi/mpt3sas/mpt3sas.ko
  kernel/drivers/scsi/qedf/qedf.ko
  kernel/drivers/scsi/qla2xxx/qla2xxx.ko
  kernel/drivers/scsi/smartpqi/smartpqi.ko
